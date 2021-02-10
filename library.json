@@ -1,0 +1,21 @@
+{
+  "name": "TTGOT5V23Tools",
+  "keywords": "TTGO T5 v2.3 Tools",
+  "description": "Handy tools for the TTGO T5 v2.3.",
+  "homepage": "",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/marcvivet/TTGOT5V23Tools.git"
+  },
+  "version": "0.0.0",
+  "authors": {
+    "name": "Marc Vivet",
+    "url": ""
+  },
+  "exclude": [
+    ".github",
+    "extras"
+  ],
+  "frameworks": "arduino",
+  "platforms": "espressif32"
+}
