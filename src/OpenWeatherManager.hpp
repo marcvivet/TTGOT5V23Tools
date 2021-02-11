@@ -10,7 +10,7 @@ public:
     bool getData(void);
     bool parseWeather(WiFiClient& json, const String& Type);
     String convertUnixTime(const int unix_time) const;
-
+    String convertIconToName(const String& IconName) const;
 private:
     OpenWeatherManager(void);
 };

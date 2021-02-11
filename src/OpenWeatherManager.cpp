@@ -114,7 +114,7 @@ bool OpenWeatherManager::parseWeather(WiFiClient& json, const String& Type) {
     WxConditions[0].Forecast0   = root["weather"][0]["description"].as<char*>(); oTM.println("For0: "+String(WxConditions[0].Forecast0));
     WxConditions[0].Forecast1   = root["weather"][1]["description"].as<char*>(); oTM.println("For1: "+String(WxConditions[0].Forecast1));
     WxConditions[0].Forecast2   = root["weather"][2]["description"].as<char*>(); oTM.println("For2: "+String(WxConditions[0].Forecast2));
-    WxConditions[0].Icon        = root["weather"][0]["icon"].as<char*>();        oTM.println("Icon: "+String(WxConditions[0].Icon));
+    WxConditions[0].Icon        = convertIconToName(root["weather"][0]["icon"].as<char*>());        oTM.println("Icon: "+String(WxConditions[0].Icon));
     WxConditions[0].Temperature = root["main"]["temp"].as<float>();              oTM.println("Temp: "+String(WxConditions[0].Temperature));
     WxConditions[0].Pressure    = root["main"]["pressure"].as<float>();          oTM.println("Pres: "+String(WxConditions[0].Pressure));
     WxConditions[0].Humidity    = root["main"]["humidity"].as<float>();          oTM.println("Humi: "+String(WxConditions[0].Humidity));
@@ -145,7 +145,7 @@ bool OpenWeatherManager::parseWeather(WiFiClient& json, const String& Type) {
       WxForecast[r].Forecast0         = list[r]["weather"][0]["main"].as<char*>();        oTM.println("For0: "+String(WxForecast[r].Forecast0));
       WxForecast[r].Forecast1         = list[r]["weather"][1]["main"].as<char*>();        oTM.println("For1: "+String(WxForecast[r].Forecast1));
       WxForecast[r].Forecast2         = list[r]["weather"][2]["main"].as<char*>();        oTM.println("For2: "+String(WxForecast[r].Forecast2));
-      WxForecast[r].Icon              = list[r]["weather"][0]["icon"].as<char*>();        oTM.println("Icon: "+String(WxForecast[r].Icon));
+      WxForecast[r].Icon              = convertIconToName(list[r]["weather"][0]["icon"].as<char*>());        oTM.println("Icon: "+String(WxForecast[r].Icon));
       WxForecast[r].Description       = list[r]["weather"][0]["description"].as<char*>(); oTM.println("Desc: "+String(WxForecast[r].Description));
       WxForecast[r].Cloudcover        = list[r]["clouds"]["all"].as<int>();               oTM.println("CCov: "+String(WxForecast[r].Cloudcover)); // in % of cloud cover
       WxForecast[r].Windspeed         = list[r]["wind"]["speed"].as<float>();             oTM.println("WSpd: "+String(WxForecast[r].Windspeed));
@@ -181,4 +181,19 @@ String OpenWeatherManager::convertUnixTime(const int unix_time) const {
     strftime(output, sizeof(output), "%I:%M%P %m/%d/%y", now_tm);
   }*/
   return output;
+}
+
+
+String OpenWeatherManager::convertIconToName(const String& IconName) const  {
+  if      (IconName == "01d" || IconName == "01n")  return "Sunny";
+  else if (IconName == "02d" || IconName == "02n")  return "MostlySunny";
+  else if (IconName == "03d" || IconName == "03n")  return "Cloudy";
+  else if (IconName == "04d" || IconName == "04n")  return "MostlySunny";
+  else if (IconName == "09d" || IconName == "09n")  return "ChanceRain";
+  else if (IconName == "10d" || IconName == "10n")  return "Rain";
+  else if (IconName == "11d" || IconName == "11n")  return "Tstorms";
+  else if (IconName == "13d" || IconName == "13n")  return "Snow";
+  else if (IconName == "50d")                       return "Haze";
+  else if (IconName == "50n")                       return "Fog";
+  else                                              return "Nodata";
 }
