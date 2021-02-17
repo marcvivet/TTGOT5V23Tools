@@ -6,5 +6,6 @@ https://www.aliexpress.com/item/32869729970.html
 
 # References
 
-Some parts of the code are based on the gread work provided in this repository.
+Parts of the code are extracted from the gread work done by David Bird which is provided in this repository:
+
 https://github.com/G6EJD/ESP32-e-Paper-Weather-Display

@@ -4,196 +4,201 @@
 #include "WiFiManager.hpp"
 #include "TerminalManager.hpp"
 
-#include <ArduinoJson.h>
+
 #include <HTTPClient.h>
 
-typedef struct { // For current Day and Day 1, 2, 3, etc
-  int      Dt;
-  String   Period;
-  String   Icon;
-  String   Trend;
-  String   Main0;
-  String   Forecast0;
-  String   Forecast1;
-  String   Forecast2;
-  String   Description;
-  String   Time;
-  String   Country;
-  float    lat;
-  float    lon;
-  float    Temperature;
-  float    Feelslike;
-  float    Humidity;
-  float    High;
-  float    Low;
-  float    Winddir;
-  float    Windspeed;
-  float    Rainfall;
-  float    Snowfall;
-  float    Pop;
-  float    Pressure;
-  int      Cloudcover;
-  int      Visibility;
-  String      Sunrise;
-  String      Sunset;
-  int      Timezone;
-} Forecast_record_type;
 
-const int max_readings = 5;
-Forecast_record_type  WxConditions[1];
-Forecast_record_type  WxForecast[max_readings];
+void OpenWeatherManager::Weather::setValuesFromJSON(const JsonObject& p_oInput, const bool p_bVervose) {
+    
+    lon = p_oInput["coord"]["lon"].as<float>();
+    lat = p_oInput["coord"]["lat"].as<float>();
+    Main0 = p_oInput["weather"][0]["main"].as<char *>();
+    Forecast0 = p_oInput["weather"][0]["description"].as<char *>();
+    Forecast1 = p_oInput["weather"][1]["description"].as<char *>();
+    Forecast2 = p_oInput["weather"][2]["description"].as<char *>();
+    Icon = p_oInput["weather"][0]["icon"].as<char *>();
+    IconName = convertIconToName(Icon);
+    Temperature = p_oInput["main"]["temp"].as<float>();
+    Pressure = p_oInput["main"]["pressure"].as<float>();
+    Humidity = p_oInput["main"]["humidity"].as<float>();
+    Low = p_oInput["main"]["temp_min"].as<float>();
+    High = p_oInput["main"]["temp_max"].as<float>();
+    Windspeed = p_oInput["wind"]["speed"].as<float>();
+    Winddir = p_oInput["wind"]["deg"].as<float>();
+    Cloudcover = p_oInput["clouds"]["all"].as<int>();
+    Visibility = p_oInput["visibility"].as<int>();
+    Rainfall = p_oInput["rain"]["1h"].as<float>();
+    Snowfall = p_oInput["snow"]["1h"].as<float>();
+    Country = p_oInput["sys"]["country"].as<char *>();
+    Sunrise = convertUnixTime(p_oInput["sys"]["sunrise"].as<int>());
+    Sunset = convertUnixTime(p_oInput["sys"]["sunset"].as<int>());
+    Timezone = p_oInput["timezone"].as<int>();
+    
+    if (p_bVervose) {
+        show();
+    }
+}
 
-OpenWeatherManager& OpenWeatherManager::getInstance()
+void OpenWeatherManager::Weather::show(void) const {
+    TerminalManager &oTM = TerminalManager::getInstance();
+
+    oTM.println(" Lon: " + String(lon));
+    oTM.println(" Lat: " + String(lat));
+    oTM.println("Main: " + String(Main0));
+    oTM.println("For0: " + String(Forecast0));
+    oTM.println("For1: " + String(Forecast1));
+    oTM.println("For2: " + String(Forecast2));
+    oTM.println("Icon: " + String(Icon));
+    oTM.println("IconName: " + String(IconName));
+    oTM.println("Temp: " + String(Temperature));
+    oTM.println("Pres: " + String(Pressure));
+    oTM.println("Humi: " + String(Humidity));
+    oTM.println("TLow: " + String(Low));
+    oTM.println("THig: " + String(High));
+    oTM.println("WSpd: " + String(Windspeed));
+    oTM.println("WDir: " + String(Winddir));
+    oTM.println("CCov: " + String(Cloudcover)); // in % of cloud cover
+    oTM.println("Visi: " + String(Visibility)); // in metres
+    oTM.println("Rain: " + String(Rainfall));
+    oTM.println("Snow: " + String(Snowfall));
+    oTM.println("Ctry: " + String(Country));
+    oTM.println("SRis: " + String(Sunrise));
+    oTM.println("SSet: " + String(Sunset));
+    oTM.println("TZon: " + String(Timezone));
+}
+
+String OpenWeatherManager::Weather::convertUnixTime(const int unix_time) const
+{
+    // Returns either '21:12  ' or ' 09:12pm' depending on Units mode
+    time_t tm = unix_time;
+    struct tm *now_tm = localtime(&tm);
+    char output[40];
+    //if (Units == "M") {
+    strftime(output, sizeof(output), "%H:%M %d/%m/%y", now_tm);
+    /*}
+  else {
+    strftime(output, sizeof(output), "%I:%M%P %m/%d/%y", now_tm);
+  }*/
+    return output;
+}
+
+String OpenWeatherManager::Weather::convertIconToName(const String &IconName) const
+{
+    if (IconName == "01d" || IconName == "01n")
+        return "Sunny";
+    else if (IconName == "02d" || IconName == "02n")
+        return "MostlySunny";
+    else if (IconName == "03d" || IconName == "03n")
+        return "Cloudy";
+    else if (IconName == "04d" || IconName == "04n")
+        return "MostlySunny";
+    else if (IconName == "09d" || IconName == "09n")
+        return "ChanceRain";
+    else if (IconName == "10d" || IconName == "10n")
+        return "Rain";
+    else if (IconName == "11d" || IconName == "11n")
+        return "Tstorms";
+    else if (IconName == "13d" || IconName == "13n")
+        return "Snow";
+    else if (IconName == "50d")
+        return "Haze";
+    else if (IconName == "50n")
+        return "Fog";
+    else
+        return "Nodata";
+}
+
+OpenWeatherManager &OpenWeatherManager::getInstance()
 {
     static OpenWeatherManager instance;
     return instance;
 }
 
-OpenWeatherManager::OpenWeatherManager(void) {
-
+OpenWeatherManager::OpenWeatherManager(void)
+{
 }
 
-bool OpenWeatherManager::getData(void) {
-    TerminalManager& oTM = TerminalManager::getInstance();
-    WiFiClient client;   // wifi client object
+bool OpenWeatherManager::update(const OpenWeatherManager::RequestType p_eRequestType, const bool p_bVervose)
+{
+    TerminalManager &oTM = TerminalManager::getInstance();
+    WiFiManager &oWM = WiFiManager::getInstance(); 
 
-    String oRequest = "weather";
-    //String oRequest = "forecast";
+    String oRequest = (p_eRequestType == RequestType::WEATHER)? "weather" : "forecast";
 
-    const String units = "metric";//(OPEN_WEATHER_UNITS == "M" ? "metric" : "imperial");
-    client.stop(); // close connection before sending a new request
-
-    HTTPClient http;
+    oTM.println("Quering for -> " + oRequest);
+   
     String uri = "/data/2.5/" + oRequest + "?q=" + OPEN_WEATHER_CITY + "," + OPEN_WEATHER_COUNTRY + "&APPID=" + OPEN_WEATHER_KEY + "&mode=json&units=" + OPEN_WEATHER_UNITS + "&lang=" + OPEN_WEATHER_LANGUAGE;
-    if(oRequest != "weather")
+
+    if (p_eRequestType == RequestType::FORECAST)
     {
-        uri += "&cnt=" + String(max_readings);
+        uri += "&cnt=" + String(FORECAST_DAYS);
     }
-    //http.begin(uri,test_root_ca); //HTTPS example connection
-    http.begin(client, OPEN_WEATHER_SERVER, 80, uri);
-    int httpCode = http.GET();
-    if(httpCode == HTTP_CODE_OK) {
-        if (!parseWeather(http.getStream(), oRequest)) return false;
-        client.stop();
-        http.end();
-        return true;
-    }
-    else
-    {
-        oTM.printf("connection failed, error: %s", http.errorToString(httpCode).c_str());
-        client.stop();
-        http.end();
-        return false;
-    }
-    http.end();
+
+    String response = oWM.httpGET(OPEN_WEATHER_SERVER, uri);
+    if (response.isEmpty()) return false;
+    parseWeather(response, p_eRequestType, p_bVervose);
+
     return true;
 }
 
+bool OpenWeatherManager::update(const bool p_bVervose)
+{
+    bool bResponse = true;
+    bResponse &= update(RequestType::WEATHER, p_bVervose);
+    bResponse &= update(RequestType::FORECAST, p_bVervose);
 
-bool OpenWeatherManager::parseWeather(WiFiClient& json, const String& Type) {
-    TerminalManager& oTM = TerminalManager::getInstance();
-    oTM.print(F("\nCreating object...and "));
-  // allocate the JsonDocument
-  DynamicJsonDocument doc(35 * 1024);
-  // Deserialize the JSON document
-  DeserializationError error = deserializeJson(doc, json);
-  // Test if parsing succeeds.
-  if (error) {
-    oTM.print(F("deserializeJson() failed: "));
-    oTM.println(error.c_str());
-    return false;
-  }
-  // convert it to a JsonObject
-  JsonObject root = doc.as<JsonObject>();
-  oTM.println(" Decoding " + Type + " data");
-  if (Type == "weather") {
-    // All Serial.println statements are for diagnostic purposes and not required, remove if not needed
-    WxConditions[0].lon         = root["coord"]["lon"].as<float>();              oTM.println(" Lon: "+String(WxConditions[0].lon));
-    WxConditions[0].lat         = root["coord"]["lat"].as<float>();              oTM.println(" Lat: "+String(WxConditions[0].lat));
-    WxConditions[0].Main0       = root["weather"][0]["main"].as<char*>();        oTM.println("Main: "+String(WxConditions[0].Main0));
-    WxConditions[0].Forecast0   = root["weather"][0]["description"].as<char*>(); oTM.println("For0: "+String(WxConditions[0].Forecast0));
-    WxConditions[0].Forecast1   = root["weather"][1]["description"].as<char*>(); oTM.println("For1: "+String(WxConditions[0].Forecast1));
-    WxConditions[0].Forecast2   = root["weather"][2]["description"].as<char*>(); oTM.println("For2: "+String(WxConditions[0].Forecast2));
-    WxConditions[0].Icon        = convertIconToName(root["weather"][0]["icon"].as<char*>());        oTM.println("Icon: "+String(WxConditions[0].Icon));
-    WxConditions[0].Temperature = root["main"]["temp"].as<float>();              oTM.println("Temp: "+String(WxConditions[0].Temperature));
-    WxConditions[0].Pressure    = root["main"]["pressure"].as<float>();          oTM.println("Pres: "+String(WxConditions[0].Pressure));
-    WxConditions[0].Humidity    = root["main"]["humidity"].as<float>();          oTM.println("Humi: "+String(WxConditions[0].Humidity));
-    WxConditions[0].Low         = root["main"]["temp_min"].as<float>();          oTM.println("TLow: "+String(WxConditions[0].Low));
-    WxConditions[0].High        = root["main"]["temp_max"].as<float>();          oTM.println("THig: "+String(WxConditions[0].High));
-    WxConditions[0].Windspeed   = root["wind"]["speed"].as<float>();             oTM.println("WSpd: "+String(WxConditions[0].Windspeed));
-    WxConditions[0].Winddir     = root["wind"]["deg"].as<float>();               oTM.println("WDir: "+String(WxConditions[0].Winddir));
-    WxConditions[0].Cloudcover  = root["clouds"]["all"].as<int>();               oTM.println("CCov: "+String(WxConditions[0].Cloudcover)); // in % of cloud cover
-    WxConditions[0].Visibility  = root["visibility"].as<int>();                  oTM.println("Visi: "+String(WxConditions[0].Visibility)); // in metres
-    WxConditions[0].Rainfall    = root["rain"]["1h"].as<float>();                oTM.println("Rain: "+String(WxConditions[0].Rainfall));
-    WxConditions[0].Snowfall    = root["snow"]["1h"].as<float>();                oTM.println("Snow: "+String(WxConditions[0].Snowfall));
-    WxConditions[0].Country     = root["sys"]["country"].as<char*>();            oTM.println("Ctry: "+String(WxConditions[0].Country));
-    WxConditions[0].Sunrise     = convertUnixTime(root["sys"]["sunrise"].as<int>());              oTM.println("SRis: "+String(WxConditions[0].Sunrise));
-    WxConditions[0].Sunset      = convertUnixTime(root["sys"]["sunset"].as<int>());               oTM.println("SSet: "+String(WxConditions[0].Sunset));
-    WxConditions[0].Timezone    = root["timezone"].as<int>();                    oTM.println("TZon: "+String(WxConditions[0].Timezone));  }
-  if (Type == "forecast") {
-    //Serial.println(json);
-    oTM.print(F("\nReceiving Forecast period - ")); //------------------------------------------------
-    JsonArray list                    = root["list"];
-    for (byte r = 0; r < max_readings; r++) {
-      Serial.println("\nPeriod-" + String(r) + "--------------");
-      WxForecast[r].Dt                = list[r]["dt"].as<int>();                          oTM.println("DTim: "+String(WxForecast[r].Dt));
-      WxForecast[r].Temperature       = list[r]["main"]["temp"].as<float>();              oTM.println("Temp: "+String(WxForecast[r].Temperature));
-      WxForecast[r].Low               = list[r]["main"]["temp_min"].as<float>();          oTM.println("TLow: "+String(WxForecast[r].Low));
-      WxForecast[r].High              = list[r]["main"]["temp_max"].as<float>();          oTM.println("THig: "+String(WxForecast[r].High));
-      WxForecast[r].Pressure          = list[r]["main"]["pressure"].as<float>();          oTM.println("Pres: "+String(WxForecast[r].Pressure));
-      WxForecast[r].Humidity          = list[r]["main"]["humidity"].as<float>();          oTM.println("Humi: "+String(WxForecast[r].Humidity));
-      WxForecast[r].Forecast0         = list[r]["weather"][0]["main"].as<char*>();        oTM.println("For0: "+String(WxForecast[r].Forecast0));
-      WxForecast[r].Forecast1         = list[r]["weather"][1]["main"].as<char*>();        oTM.println("For1: "+String(WxForecast[r].Forecast1));
-      WxForecast[r].Forecast2         = list[r]["weather"][2]["main"].as<char*>();        oTM.println("For2: "+String(WxForecast[r].Forecast2));
-      WxForecast[r].Icon              = convertIconToName(list[r]["weather"][0]["icon"].as<char*>());        oTM.println("Icon: "+String(WxForecast[r].Icon));
-      WxForecast[r].Description       = list[r]["weather"][0]["description"].as<char*>(); oTM.println("Desc: "+String(WxForecast[r].Description));
-      WxForecast[r].Cloudcover        = list[r]["clouds"]["all"].as<int>();               oTM.println("CCov: "+String(WxForecast[r].Cloudcover)); // in % of cloud cover
-      WxForecast[r].Windspeed         = list[r]["wind"]["speed"].as<float>();             oTM.println("WSpd: "+String(WxForecast[r].Windspeed));
-      WxForecast[r].Winddir           = list[r]["wind"]["deg"].as<float>();               oTM.println("WDir: "+String(WxForecast[r].Winddir));
-      WxForecast[r].Rainfall          = list[r]["rain"]["3h"].as<float>();                oTM.println("Rain: "+String(WxForecast[r].Rainfall));
-      WxForecast[r].Snowfall          = list[r]["snow"]["3h"].as<float>();                oTM.println("Snow: "+String(WxForecast[r].Snowfall));
-      WxForecast[r].Pop               = list[r]["pop"].as<float>();                       oTM.println("Pop:  "+String(WxForecast[r].Pop));
-      WxForecast[r].Period            = list[r]["dt_txt"].as<char*>();                    oTM.println("Peri: "+String(WxForecast[r].Period));
+    return bResponse;
+}
+
+bool OpenWeatherManager::parseWeather(const String &p_oResponse, const OpenWeatherManager::RequestType p_eRequestType, const bool p_bVervose)
+{
+    TerminalManager &oTM = TerminalManager::getInstance();
+    oTM.println(F("\nCreating object..."));
+    // allocate the JsonDocument
+    DynamicJsonDocument doc(35 * 1024);
+    // Deserialize the JSON document
+    DeserializationError error = deserializeJson(doc, p_oResponse);
+    // Test if parsing succeeds.
+    if (error)
+    {
+        oTM.print(F("deserializeJson() failed: "));
+        oTM.println(error.c_str());
+        return false;
     }
-    //------------------------------------------
-    float pressure_trend = WxForecast[0].Pressure - WxForecast[2].Pressure; // Measure pressure slope between ~now and later
-    pressure_trend = ((int)(pressure_trend * 10)) / 10.0; // Remove any small variations less than 0.1
-    WxConditions[0].Trend = "0";
-    if (pressure_trend > 0)  WxConditions[0].Trend = "+";
-    if (pressure_trend < 0)  WxConditions[0].Trend = "-";
-    if (pressure_trend == 0) WxConditions[0].Trend = "0";
+    // convert it to a JsonObject
+    JsonObject root = doc.as<JsonObject>();
+    oTM.println(" Decoding data");
+    if (p_eRequestType == RequestType::WEATHER)
+    {
+        m_oCurrentWather.setValuesFromJSON(root);
+    } else {
+        oTM.println("Receiving Forecast"); 
+        JsonArray list = root["list"];
+        for (uint8_t r = 0; r < FORECAST_DAYS; ++r)
+        {
+            oTM.printf("Day %d\n", r + 1); 
+            m_oForecastWeather[r].setValuesFromJSON(list[r], p_bVervose);
+        }
+        //------------------------------------------
+        float pressure_trend = m_oForecastWeather[0].Pressure - m_oForecastWeather[2].Pressure; // Measure pressure slope between ~now and later
+        pressure_trend = ((int)(pressure_trend * 10)) / 10.0;                   // Remove any small variations less than 0.1
+        m_oCurrentWather.Trend = "0";
+        if (pressure_trend > 0)
+            m_oCurrentWather.Trend = "+";
+        if (pressure_trend < 0)
+            m_oCurrentWather.Trend = "-";
+        if (pressure_trend == 0)
+            m_oCurrentWather.Trend = "0";
 
-    //if (Units == "I") Convert_Readings_to_Imperial();
-  }
-  return true;
+        //if (Units == "I") Convert_Readings_to_Imperial();
+    }
+    return true;
 }
 
-
-String OpenWeatherManager::convertUnixTime(const int unix_time) const {
-  // Returns either '21:12  ' or ' 09:12pm' depending on Units mode
-  time_t tm = unix_time;
-  struct tm *now_tm = localtime(&tm);
-  char output[40];
-  //if (Units == "M") {
-  strftime(output, sizeof(output), "%H:%M %d/%m/%y", now_tm);
-  /*}
-  else {
-    strftime(output, sizeof(output), "%I:%M%P %m/%d/%y", now_tm);
-  }*/
-  return output;
+const OpenWeatherManager::Weather& OpenWeatherManager::getWeather(void) const {
+    return m_oCurrentWather;
 }
 
-
-String OpenWeatherManager::convertIconToName(const String& IconName) const  {
-  if      (IconName == "01d" || IconName == "01n")  return "Sunny";
-  else if (IconName == "02d" || IconName == "02n")  return "MostlySunny";
-  else if (IconName == "03d" || IconName == "03n")  return "Cloudy";
-  else if (IconName == "04d" || IconName == "04n")  return "MostlySunny";
-  else if (IconName == "09d" || IconName == "09n")  return "ChanceRain";
-  else if (IconName == "10d" || IconName == "10n")  return "Rain";
-  else if (IconName == "11d" || IconName == "11n")  return "Tstorms";
-  else if (IconName == "13d" || IconName == "13n")  return "Snow";
-  else if (IconName == "50d")                       return "Haze";
-  else if (IconName == "50n")                       return "Fog";
-  else                                              return "Nodata";
+const OpenWeatherManager::Forecast& OpenWeatherManager::getForecast(void) const {
+    return m_oForecastWeather;
 }

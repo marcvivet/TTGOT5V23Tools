@@ -3,6 +3,8 @@
 #include "WiFiManager.hpp"
 #include "TerminalManager.hpp"
 
+#include <HTTPClient.h>
+
 
 WiFiManager& WiFiManager::getInstance()
 {
@@ -79,4 +81,31 @@ const bool WiFiManager::disconnect(void) const {
     WiFi.disconnect();
     WiFi.mode(WIFI_OFF);
     return true;
+}
+
+String WiFiManager::httpGET(const String& p_oServer, const String& p_oUri, const int p_iPort, const int p_iRetry) const {
+    TerminalManager &oTM = TerminalManager::getInstance();
+    WiFiClient client;
+    HTTPClient http;
+    client.stop();
+
+    http.begin(client, p_oServer, p_iPort, p_oUri);
+    for (int i = 0; i < p_iRetry; ++i) {
+        int httpCode = http.GET();
+        if (httpCode == HTTP_CODE_OK)
+        {
+            oTM.println("Request succesfuly!");
+            String output = http.getString();
+            
+            http.end();
+            return output;
+        }
+        
+        oTM.printf("Request [%d] failed, error: %s", i, http.errorToString(httpCode).c_str());
+        delay(500);
+    }
+    
+    client.stop();
+    http.end();
+    return String();
 }

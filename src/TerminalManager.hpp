@@ -25,22 +25,12 @@ public:
     static TerminalManager& getInstance(void);
 
     virtual size_t write(uint8_t);
-   // virtual size_t write(const uint8_t *buffer, size_t size);
-
 
     template<class T>
     size_t printAutoFlush(const T& p_oString);
 
     template<class T>
     size_t printAutoFlush(const T& p_oString, int value);
-
-    /*
-    template<class T>
-    size_t println(const T& p_oString);
-
-    template<class T>
-    size_t println(const T& p_oString, int value);
-    */
 
     void flush(void);
     void flushOnAuto(void);
@@ -64,6 +54,8 @@ private:
     uint16_t m_uiScreenHeight;
 
     TerminalManager(void);
+    TerminalManager(TerminalManager const&);
+    void operator=(TerminalManager const&);
     void setCursor(void);
     
 };

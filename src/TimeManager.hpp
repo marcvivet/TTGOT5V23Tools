@@ -11,6 +11,8 @@ public:
 private:
     struct tm m_sTimeInfo;
     TimeManager(void);
+    TimeManager(TimeManager const&);
+    void operator=(TimeManager const&);
 };
 
 #endif

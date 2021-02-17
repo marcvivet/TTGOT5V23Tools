@@ -32,6 +32,8 @@ private:
     GxEPD_Class m_oDisplay;
 
     DisplayManager(void);
+    DisplayManager(DisplayManager const&);
+    void operator=(DisplayManager const&);
 };
 
 #endif
